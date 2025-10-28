@@ -14,16 +14,253 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alerts: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean | null
+          message: string
+          severity: Database["public"]["Enums"]["alert_severity"]
+          title: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          severity?: Database["public"]["Enums"]["alert_severity"]
+          title: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          severity?: Database["public"]["Enums"]["alert_severity"]
+          title?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      crop_advisory: {
+        Row: {
+          best_planting_months: string[] | null
+          created_at: string
+          crop_type: Database["public"]["Enums"]["crop_type"]
+          description: string
+          id: string
+          rainfall_requirement: string | null
+          season: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          best_planting_months?: string[] | null
+          created_at?: string
+          crop_type: Database["public"]["Enums"]["crop_type"]
+          description: string
+          id?: string
+          rainfall_requirement?: string | null
+          season?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          best_planting_months?: string[] | null
+          created_at?: string
+          crop_type?: Database["public"]["Enums"]["crop_type"]
+          description?: string
+          id?: string
+          rainfall_requirement?: string | null
+          season?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      crops: {
+        Row: {
+          area_acres: number | null
+          created_at: string
+          crop_type: Database["public"]["Enums"]["crop_type"]
+          expected_harvest_date: string | null
+          id: string
+          notes: string | null
+          planted_date: string
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          area_acres?: number | null
+          created_at?: string
+          crop_type: Database["public"]["Enums"]["crop_type"]
+          expected_harvest_date?: string | null
+          id?: string
+          notes?: string | null
+          planted_date: string
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          area_acres?: number | null
+          created_at?: string
+          crop_type?: Database["public"]["Enums"]["crop_type"]
+          expected_harvest_date?: string | null
+          id?: string
+          notes?: string | null
+          planted_date?: string
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          farm_location: string | null
+          farm_size_acres: number | null
+          full_name: string
+          id: string
+          phone_number: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          farm_location?: string | null
+          farm_size_acres?: number | null
+          full_name: string
+          id?: string
+          phone_number?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          farm_location?: string | null
+          farm_size_acres?: number | null
+          full_name?: string
+          id?: string
+          phone_number?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      rainfall_records: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          location: string
+          rainfall_mm: number
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          location: string
+          rainfall_mm: number
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          location?: string
+          rainfall_mm?: number
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      weather_data: {
+        Row: {
+          conditions: string | null
+          created_at: string
+          forecast_date: string
+          humidity: number | null
+          id: string
+          location: string
+          rainfall_mm: number | null
+          temperature: number | null
+          wind_speed: number | null
+        }
+        Insert: {
+          conditions?: string | null
+          created_at?: string
+          forecast_date: string
+          humidity?: number | null
+          id?: string
+          location: string
+          rainfall_mm?: number | null
+          temperature?: number | null
+          wind_speed?: number | null
+        }
+        Update: {
+          conditions?: string | null
+          created_at?: string
+          forecast_date?: string
+          humidity?: number | null
+          id?: string
+          location?: string
+          rainfall_mm?: number | null
+          temperature?: number | null
+          wind_speed?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      alert_severity: "info" | "warning" | "critical"
+      app_role: "admin" | "farmer"
+      crop_type:
+        | "maize"
+        | "beans"
+        | "potatoes"
+        | "tomatoes"
+        | "cabbage"
+        | "wheat"
+        | "rice"
+        | "coffee"
+        | "tea"
+        | "sugarcane"
+        | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +387,22 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      alert_severity: ["info", "warning", "critical"],
+      app_role: ["admin", "farmer"],
+      crop_type: [
+        "maize",
+        "beans",
+        "potatoes",
+        "tomatoes",
+        "cabbage",
+        "wheat",
+        "rice",
+        "coffee",
+        "tea",
+        "sugarcane",
+        "other",
+      ],
+    },
   },
 } as const
