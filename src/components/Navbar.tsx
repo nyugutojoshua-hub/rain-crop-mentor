@@ -2,19 +2,23 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Cloud, Menu, X } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 const Navbar = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
 
-  const navLinks = [
-    { path: "/", label: "Home" },
-    { path: "/dashboard", label: "Dashboard" },
-    { path: "/reports", label: "Reports" },
-    { path: "/admin", label: "Admin" },
-  ];
+  const navLinks = user
+    ? [
+        { path: "/", label: "Home" },
+        { path: "/dashboard", label: "Dashboard" },
+        { path: "/reports", label: "Reports" },
+        { path: "/admin", label: "Admin" },
+      ]
+    : [{ path: "/", label: "Home" }];
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-sm border-b border-border shadow-[var(--shadow-soft)]">
@@ -40,11 +44,17 @@ const Navbar = () => {
                 {link.label}
               </Link>
             ))}
-            <Link to="/auth">
-              <Button variant="hero" size="sm">
-                Sign In
+            {user ? (
+              <Button variant="hero" size="sm" onClick={signOut}>
+                Sign Out
               </Button>
-            </Link>
+            ) : (
+              <Link to="/auth">
+                <Button variant="hero" size="sm">
+                  Sign In
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -73,11 +83,25 @@ const Navbar = () => {
                   {link.label}
                 </Link>
               ))}
-              <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="hero" size="sm" className="w-full">
-                  Sign In
+              {user ? (
+                <Button
+                  variant="hero"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    signOut();
+                  }}
+                >
+                  Sign Out
                 </Button>
-              </Link>
+              ) : (
+                <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="hero" size="sm" className="w-full">
+                    Sign In
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         )}
