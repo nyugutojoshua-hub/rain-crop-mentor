@@ -1,13 +1,35 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Cloud, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { Cloud, Menu, X, Shield } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const Navbar = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { user, signOut } = useAuth();
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .single();
+
+      setIsAdmin(!!data);
+    };
+
+    checkAdminStatus();
+  }, [user]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -16,7 +38,7 @@ const Navbar = () => {
         { path: "/", label: "Home" },
         { path: "/dashboard", label: "Dashboard" },
         { path: "/reports", label: "Reports" },
-        { path: "/admin", label: "Admin" },
+        ...(isAdmin ? [{ path: "/admin", label: "Admin", icon: Shield }] : []),
       ]
     : [{ path: "/", label: "Home" }];
 
@@ -33,27 +55,39 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`text-sm font-medium transition-colors hover:text-primary ${
-                  isActive(link.path) ? "text-primary" : "text-muted-foreground"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`text-sm font-medium transition-colors hover:text-primary flex items-center gap-1 ${
+                    isActive(link.path) ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  {Icon && <Icon className="w-4 h-4" />}
+                  {link.label}
+                </Link>
+              );
+            })}
             {user ? (
               <Button variant="hero" size="sm" onClick={signOut}>
                 Sign Out
               </Button>
             ) : (
-              <Link to="/auth">
-                <Button variant="hero" size="sm">
-                  Sign In
-                </Button>
-              </Link>
+              <>
+                <Link to="/auth">
+                  <Button variant="hero" size="sm">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link to="/admin/login">
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <Shield className="w-3 h-3" />
+                    Admin
+                  </Button>
+                </Link>
+              </>
             )}
           </div>
 
@@ -71,18 +105,22 @@ const Navbar = () => {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-border">
             <div className="flex flex-col gap-4">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
-                    isActive(link.path) ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {navLinks.map((link) => {
+                const Icon = link.icon;
+                return (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`text-sm font-medium transition-colors hover:text-primary flex items-center gap-1 ${
+                      isActive(link.path) ? "text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    {Icon && <Icon className="w-4 h-4" />}
+                    {link.label}
+                  </Link>
+                );
+              })}
               {user ? (
                 <Button
                   variant="hero"
@@ -96,11 +134,19 @@ const Navbar = () => {
                   Sign Out
                 </Button>
               ) : (
-                <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="hero" size="sm" className="w-full">
-                    Sign In
-                  </Button>
-                </Link>
+                <>
+                  <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="hero" size="sm" className="w-full">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/admin/login" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="outline" size="sm" className="w-full gap-1">
+                      <Shield className="w-3 h-3" />
+                      Admin Login
+                    </Button>
+                  </Link>
+                </>
               )}
             </div>
           </div>

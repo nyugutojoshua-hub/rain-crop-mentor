@@ -106,8 +106,11 @@ const Admin = () => {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="pt-24 pb-16 flex items-center justify-center">
+        <div className="pt-24 pb-16 flex flex-col items-center justify-center gap-4">
           <p className="text-muted-foreground">Access denied. Admin privileges required.</p>
+          <Button onClick={() => window.location.href = '/admin/login'}>
+            Go to Admin Login
+          </Button>
         </div>
       </div>
     );
