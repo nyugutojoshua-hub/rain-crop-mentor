@@ -1,25 +1,97 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, TrendingUp, Download, Calendar } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 const Reports = () => {
-  const rainfallData = [
-    { month: "Jan", amount: 45 },
-    { month: "Feb", amount: 62 },
-    { month: "Mar", amount: 78 },
-    { month: "Apr", amount: 95 },
-    { month: "May", amount: 120 },
-    { month: "Jun", amount: 85 }
-  ];
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [rainfallData, setRainfallData] = useState<any[]>([]);
+  const [cropPerformance, setCropPerformance] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const cropPerformance = [
-    { crop: "Maize", yield: 85, trend: "+12%" },
-    { crop: "Beans", yield: 78, trend: "+8%" },
-    { crop: "Wheat", yield: 92, trend: "+15%" },
-    { crop: "Rice", yield: 75, trend: "+5%" }
-  ];
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchData = async () => {
+      try {
+        // Fetch rainfall records for the last 6 months
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        
+        const { data: rainfall, error: rainfallError } = await supabase
+          .from('rainfall_records')
+          .select('*')
+          .gte('date', sixMonthsAgo.toISOString())
+          .order('date', { ascending: true });
+
+        if (rainfallError) throw rainfallError;
+        
+        // Group rainfall by month
+        const monthlyRainfall = (rainfall || []).reduce((acc: any, record: any) => {
+          const month = new Date(record.date).toLocaleString('default', { month: 'short' });
+          if (!acc[month]) {
+            acc[month] = { month, amount: 0 };
+          }
+          acc[month].amount += parseFloat(record.rainfall_mm);
+          return acc;
+        }, {});
+        
+        setRainfallData(Object.values(monthlyRainfall));
+
+        // Fetch user's crops
+        const { data: crops, error: cropsError } = await supabase
+          .from('crops')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (cropsError) throw cropsError;
+        
+        // Calculate crop performance
+        const performance = (crops || []).reduce((acc: any, crop: any) => {
+          const existing = acc.find((p: any) => p.crop === crop.crop_type);
+          if (existing) {
+            existing.count += 1;
+          } else {
+            acc.push({ crop: crop.crop_type, count: 1 });
+          }
+          return acc;
+        }, []);
+        
+        setCropPerformance(performance);
+      } catch (error: any) {
+        toast({
+          title: "Error loading reports",
+          description: error.message,
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user, toast]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="pt-24 pb-16 flex items-center justify-center">
+          <p className="text-muted-foreground">Loading reports...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const totalRainfall = rainfallData.reduce((sum, data) => sum + data.amount, 0);
+  const avgMonthly = rainfallData.length > 0 ? totalRainfall / rainfallData.length : 0;
+  const maxRainfall = Math.max(...rainfallData.map(d => d.amount), 1);
 
   return (
     <div className="min-h-screen bg-background">
@@ -59,7 +131,7 @@ const Reports = () => {
                     <CardTitle className="text-sm font-medium">Total Rainfall</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-secondary">485mm</div>
+                    <div className="text-3xl font-bold text-secondary">{totalRainfall.toFixed(0)}mm</div>
                     <p className="text-xs text-muted-foreground mt-1">Last 6 months</p>
                   </CardContent>
                 </Card>
@@ -68,17 +140,17 @@ const Reports = () => {
                     <CardTitle className="text-sm font-medium">Average Monthly</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-primary">81mm</div>
+                    <div className="text-3xl font-bold text-primary">{avgMonthly.toFixed(0)}mm</div>
                     <p className="text-xs text-muted-foreground mt-1">Per month</p>
                   </CardContent>
                 </Card>
                 <Card className="border-border">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Growth Rate</CardTitle>
+                    <CardTitle className="text-sm font-medium">Records</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-accent">+18%</div>
-                    <p className="text-xs text-muted-foreground mt-1">Compared to last year</p>
+                    <div className="text-3xl font-bold text-accent">{rainfallData.length}</div>
+                    <p className="text-xs text-muted-foreground mt-1">Data points</p>
                   </CardContent>
                 </Card>
               </div>
@@ -94,20 +166,26 @@ const Reports = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {rainfallData.map((data) => (
-                      <div key={data.month} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium">{data.month}</span>
-                          <span className="text-muted-foreground">{data.amount}mm</span>
+                    {rainfallData.length > 0 ? (
+                      rainfallData.map((data) => (
+                        <div key={data.month} className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium">{data.month}</span>
+                            <span className="text-muted-foreground">{data.amount.toFixed(1)}mm</span>
+                          </div>
+                          <div className="h-3 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-secondary to-primary rounded-full transition-all"
+                              style={{ width: `${(data.amount / maxRainfall) * 100}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-3 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-gradient-to-r from-secondary to-primary rounded-full transition-all"
-                            style={{ width: `${(data.amount / 120) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No rainfall data available
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -124,26 +202,36 @@ const Reports = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {cropPerformance.map((crop) => (
-                      <div key={crop.crop} className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-semibold">{crop.crop}</h4>
-                            <p className="text-sm text-muted-foreground">Yield Performance</p>
+                    {cropPerformance.length > 0 ? (
+                      cropPerformance.map((crop) => {
+                        const maxCount = Math.max(...cropPerformance.map(c => c.count), 1);
+                        const percentage = (crop.count / maxCount) * 100;
+                        return (
+                          <div key={crop.crop} className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-semibold">{crop.crop}</h4>
+                                <p className="text-sm text-muted-foreground">Crop Count</p>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-2xl font-bold">{crop.count}</div>
+                                <div className="text-sm text-primary font-medium">Fields</div>
+                              </div>
+                            </div>
+                            <div className="h-3 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold">{crop.yield}%</div>
-                            <div className="text-sm text-primary font-medium">{crop.trend}</div>
-                          </div>
-                        </div>
-                        <div className="h-3 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all"
-                            style={{ width: `${crop.yield}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                        );
+                      })
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No crop data available
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -151,39 +239,49 @@ const Reports = () => {
               <div className="grid md:grid-cols-2 gap-6">
                 <Card className="border-border">
                   <CardHeader>
-                    <CardTitle>Best Performing Crop</CardTitle>
+                    <CardTitle>Most Popular Crop</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-6">
-                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center mx-auto mb-4">
-                        <TrendingUp className="w-8 h-8 text-primary-foreground" />
+                    {cropPerformance.length > 0 ? (
+                      <div className="text-center py-6">
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center mx-auto mb-4">
+                          <TrendingUp className="w-8 h-8 text-primary-foreground" />
+                        </div>
+                        <h3 className="text-2xl font-bold mb-2">
+                          {cropPerformance.sort((a, b) => b.count - a.count)[0].crop}
+                        </h3>
+                        <p className="text-muted-foreground">
+                          {cropPerformance.sort((a, b) => b.count - a.count)[0].count} fields
+                        </p>
+                        <p className="text-primary font-medium mt-1">Most cultivated</p>
                       </div>
-                      <h3 className="text-2xl font-bold mb-2">Wheat</h3>
-                      <p className="text-muted-foreground">92% yield performance</p>
-                      <p className="text-primary font-medium mt-1">+15% growth</p>
-                    </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-6">
+                        No crop data available
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 
                 <Card className="border-border">
                   <CardHeader>
-                    <CardTitle>Recommended Actions</CardTitle>
+                    <CardTitle>Your Crops</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <ul className="space-y-3">
-                      <li className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
-                        <div className="w-2 h-2 rounded-full bg-primary mt-1.5" />
-                        <span className="text-sm">Increase wheat cultivation area</span>
-                      </li>
-                      <li className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
-                        <div className="w-2 h-2 rounded-full bg-secondary mt-1.5" />
-                        <span className="text-sm">Optimize bean planting schedule</span>
-                      </li>
-                      <li className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
-                        <div className="w-2 h-2 rounded-full bg-accent mt-1.5" />
-                        <span className="text-sm">Monitor rice field moisture levels</span>
-                      </li>
-                    </ul>
+                    {cropPerformance.length > 0 ? (
+                      <ul className="space-y-3">
+                        {cropPerformance.map((crop, idx) => (
+                          <li key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+                            <div className="w-2 h-2 rounded-full bg-primary mt-1.5" />
+                            <span className="text-sm">{crop.crop}: {crop.count} field(s)</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-6">
+                        No crops planted yet
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </div>

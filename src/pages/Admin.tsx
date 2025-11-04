@@ -1,23 +1,123 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Users, Upload, Activity, Settings, Search } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 const Admin = () => {
-  const users = [
-    { id: 1, name: "John Kamau", email: "john@example.com", location: "Kiambu", status: "Active", joined: "Jan 2025" },
-    { id: 2, name: "Mary Wanjiru", email: "mary@example.com", location: "Nakuru", status: "Active", joined: "Dec 2024" },
-    { id: 3, name: "Peter Ochieng", email: "peter@example.com", location: "Kisumu", status: "Inactive", joined: "Nov 2024" },
-    { id: 4, name: "Sarah Akinyi", email: "sarah@example.com", location: "Machakos", status: "Active", joined: "Jan 2025" }
-  ];
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [users, setUsers] = useState<any[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeFarms: 0,
+    weatherRecords: 0,
+    cropAdvisories: 0
+  });
+
+  useEffect(() => {
+    if (!user) return;
+
+    const checkAdminAndFetchData = async () => {
+      try {
+        // Check if user is admin
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .single();
+
+        const adminStatus = !!roleData;
+        setIsAdmin(adminStatus);
+
+        if (!adminStatus) {
+          toast({
+            title: "Access Denied",
+            description: "You do not have admin privileges",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Fetch all users with profiles
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (profilesError) throw profilesError;
+        setUsers(profilesData || []);
+
+        // Fetch stats
+        const [
+          { count: usersCount },
+          { count: cropsCount },
+          { count: weatherCount },
+          { count: advisoriesCount }
+        ] = await Promise.all([
+          supabase.from('profiles').select('*', { count: 'exact', head: true }),
+          supabase.from('crops').select('*', { count: 'exact', head: true }),
+          supabase.from('weather_data').select('*', { count: 'exact', head: true }),
+          supabase.from('crop_advisory').select('*', { count: 'exact', head: true })
+        ]);
+
+        setStats({
+          totalUsers: usersCount || 0,
+          activeFarms: cropsCount || 0,
+          weatherRecords: weatherCount || 0,
+          cropAdvisories: advisoriesCount || 0
+        });
+      } catch (error: any) {
+        toast({
+          title: "Error loading admin data",
+          description: error.message,
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAdminAndFetchData();
+  }, [user, toast]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="pt-24 pb-16 flex items-center justify-center">
+          <p className="text-muted-foreground">Loading admin panel...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="pt-24 pb-16 flex items-center justify-center">
+          <p className="text-muted-foreground">Access denied. Admin privileges required.</p>
+        </div>
+      </div>
+    );
+  }
 
   const systemStats = [
-    { label: "Total Users", value: "1,247", icon: Users, color: "text-primary" },
-    { label: "Active Farms", value: "892", icon: Activity, color: "text-secondary" },
-    { label: "Data Updates", value: "156", icon: Upload, color: "text-accent" },
-    { label: "System Health", value: "98%", icon: Settings, color: "text-primary" }
+    { label: "Total Users", value: stats.totalUsers.toString(), icon: Users, color: "text-primary" },
+    { label: "Active Farms", value: stats.activeFarms.toString(), icon: Activity, color: "text-secondary" },
+    { label: "Weather Records", value: stats.weatherRecords.toString(), icon: Upload, color: "text-accent" },
+    { label: "Crop Advisories", value: stats.cropAdvisories.toString(), icon: Settings, color: "text-primary" }
   ];
 
   return (
@@ -86,30 +186,27 @@ const Admin = () => {
 
                   {/* User Table */}
                   <div className="space-y-3">
-                    {users.map((user) => (
-                      <div key={user.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                        <div className="flex-1">
-                          <h4 className="font-semibold">{user.name}</h4>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {user.location} • Joined {user.joined}
-                          </p>
+                    {users.length > 0 ? (
+                      users.map((userProfile) => (
+                        <div key={userProfile.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                          <div className="flex-1">
+                            <h4 className="font-semibold">{userProfile.full_name}</h4>
+                            <p className="text-sm text-muted-foreground">{userProfile.email}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {userProfile.farm_location || 'Location not set'} • Joined {new Date(userProfile.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge variant="default">Active</Badge>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Badge variant={user.status === "Active" ? "default" : "secondary"}>
-                            {user.status}
-                          </Badge>
-                          <Button variant="outline" size="sm">
-                            Manage
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No users found
+                      </p>
+                    )}
                   </div>
-
-                  <Button variant="outline" className="w-full mt-4">
-                    Load More Users
-                  </Button>
                 </CardContent>
               </Card>
             </div>
